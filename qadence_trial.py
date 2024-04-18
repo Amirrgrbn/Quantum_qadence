@@ -1,12 +1,9 @@
 #%%
 # library imports
 import numpy as np
-
 from itertools import product
 import matplotlib.pyplot as plt
-#%%
 from qadence import *
-#%%
 from torch import (
 nn,
 optim,
@@ -19,7 +16,7 @@ sin,
 exp,
 rand,
 linspace,
-manual_seed,
+manual_seed
 )
 from torch.autograd import grad
 # random seed
@@ -50,7 +47,7 @@ class DomainSampling(nn.Module):
     Collocation points sampling from domains uses uniform random sampling.
     Problem-specific MSE loss function for solving the 2D Laplace equation.
     """
-    def __init__(self, net: nn.Module | QNN, n_inputs: int = 2, n_colpoints: int = 20):
+    def __init__(self, net: nn.Module or QNN, n_inputs: int = 4, n_colpoints: int = 20): # type: ignore
         super().__init__()
         self.net = net
         self.n_colpoints = n_colpoints
@@ -59,7 +56,7 @@ class DomainSampling(nn.Module):
         sample = rand(size=(self.n_colpoints, self.n_inputs))
         sample[:, 0] = 0.0
         return self.net(sample).pow(2).mean()
-    def right_boundary(self) -> tensor: # u(L,      y)=0
+    def right_boundary(self) -> tensor: # u(L,y)=0
         sample = rand(size=(self.n_colpoints, self.n_inputs))
         sample[:, 0] = 1.0
         return self.net(sample).pow(2).mean()
@@ -78,8 +75,8 @@ class DomainSampling(nn.Module):
         return (second_both[:, 0] + second_both[:, 1]).pow(2).mean()
 
 #%%
-LEARNING_RATE = 0.01
-N_QUBITS = 4
+LEARNING_RATE = 0.001
+N_QUBITS = 5
 DEPTH = 3
 VARIABLES = ("x", "y")
 N_POINTS = 150
@@ -100,15 +97,20 @@ model = QNN(circuit=circuit, observable=obs, inputs=VARIABLES)
 opt = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # get the collocation sampling for loss calculation
 sol = DomainSampling(net=model, n_inputs=2, n_colpoints=100)
+
+#%%
 # training
 for epoch in range(1000):
     opt.zero_grad()
     loss = (sol.left_boundary()+ sol.right_boundary()+ sol.top_boundary()+ sol.bottom_boundary()+ sol.interior())
     loss.backward()
     opt.step()
+
+#%%    
 # visualisation and comparison of results
-single_domain = linspace(0, 1, steps=N_POINTS)
-domain = tensor(list(product(single_domain, single_domain)))
+x_domain = linspace(0, 1, steps=N_POINTS)
+y_domain = linspace(0, 1, steps=N_POINTS)
+domain = tensor(list(product(x_domain, y_domain)))
 # analytical solution
 analytic_sol = ((exp(-np.pi * domain[:, 0]) * sin(np.pi * domain[:, 1])).reshape(N_POINTS, N_POINTS).T)
 # DQC solution
@@ -124,3 +126,5 @@ ax[1].set_xlabel("x")
 ax[1].set_ylabel("y")
 ax[1].set_title("DQC solution u(x,y)")
 plt.show()
+
+# %%
